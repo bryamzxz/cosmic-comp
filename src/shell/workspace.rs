@@ -208,6 +208,9 @@ pub struct FullscreenSurface {
     pub previous_geometry: Option<Rectangle<i32, Local>>,
     start_at: Option<Instant>,
     pub ended_at: Option<Instant>,
+    /// When true, this surface is still inside a CosmicStack.
+    /// On unfullscreen, reactivate the tab instead of remapping.
+    pub stack_tab: bool,
 }
 
 impl PartialEq for FullscreenSurface {
@@ -1118,6 +1121,7 @@ impl Workspace {
                     previous_geometry: previous.map(|p| p.previous_geometry),
                     start_at: None,
                     ended_at: None,
+                    stack_tab: false,
                 });
                 old_fullscreen
             }
@@ -1204,6 +1208,7 @@ impl Workspace {
         seat: impl Into<Option<&'a Seat<State>>>,
         restore: Option<FullscreenRestoreState>,
         previous_geometry: Option<Rectangle<i32, Local>>,
+        stack_tab: bool,
     ) -> Option<(
         CosmicSurface,
         Option<FullscreenRestoreState>,
@@ -1229,6 +1234,7 @@ impl Workspace {
             previous_geometry,
             start_at: Some(Instant::now()),
             ended_at: None,
+            stack_tab,
         });
 
         res
@@ -1292,6 +1298,10 @@ impl Workspace {
             .filter(|f| f.alive())
             .filter(|f| f.ended_at.is_none())
             .map(|f| &f.surface)
+    }
+
+    pub fn fullscreen_is_stack_tab(&self) -> bool {
+        self.fullscreen.as_ref().is_some_and(|f| f.stack_tab)
     }
 
     pub fn resize(

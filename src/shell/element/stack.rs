@@ -492,6 +492,38 @@ impl CosmicStack {
         self.0.force_redraw()
     }
 
+    /// Switch the active tab away from `idx` to the nearest visible tab.
+    /// Used when a tab goes fullscreen without being extracted from the stack.
+    pub fn switch_active_away_from(&self, idx: usize) {
+        self.0.with_program(|p| {
+            let windows = p.windows.lock().unwrap();
+            if windows.len() <= 1 {
+                return;
+            }
+            let current = p.active.load(Ordering::SeqCst);
+            if current != idx {
+                return; // already on a different tab
+            }
+            // Find nearest tab that isn't the one going fullscreen
+            let next = (0..windows.len())
+                .filter(|&i| i != idx)
+                .min_by_key(|&i| (i as isize - idx as isize).unsigned_abs())
+                .unwrap_or(0);
+            let old = p.active.swap(next, Ordering::SeqCst);
+            if old != next {
+                p.previous_keyboard.store(old, Ordering::SeqCst);
+            }
+        });
+        self.0
+            .resize(Size::from((self.active().geometry().size.w, TAB_HEIGHT)));
+        self.0.force_redraw()
+    }
+
+    /// Reactivate a tab that was fullscreened without extraction.
+    pub fn reactivate_tab(&self, window: &CosmicSurface) {
+        self.set_active(window);
+    }
+
     pub fn set_tiled(&self, tiled: bool) {
         self.0
             .with_program(|p| p.tiled.store(tiled, Ordering::Release));
